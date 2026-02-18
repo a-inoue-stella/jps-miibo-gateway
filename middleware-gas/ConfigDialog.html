@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <style>
+      body { padding: 10px; font-family: sans-serif; }
+      .form-group { margin-bottom: 15px; }
+      label { display: block; font-weight: bold; margin-bottom: 5px; }
+      input[type="text"], input[type="password"], input[type="number"] { width: 100%; box-sizing: border-box; padding: 8px; }
+      .note { font-size: 0.8em; color: #666; margin-top: 3px; }
+      .section-title { font-size: 1.1em; border-bottom: 2px solid #eee; margin-top: 20px; margin-bottom: 10px; padding-bottom: 5px; color: #4285f4; }
+      button.action { background-color: #4285f4; color: white; margin-top: 20px; }
+    </style>
+  </head>
+  <body>
+    <form id="configForm" onsubmit="handleFormSubmit(this)">
+      
+      <div class="section-title">LINE設定</div>
+      <div class="form-group">
+        <label for="lineToken">LINE Messaging API Token</label>
+        <input type="password" id="lineToken" name="lineToken" placeholder="既存の設定を維持する場合は空欄">
+      </div>
+
+      <div class="section-title">Chatwork設定</div>
+      <div class="form-group">
+        <label for="chatworkToken">Chatwork API Token</label>
+        <input type="password" id="chatworkToken" name="chatworkToken" placeholder="BotアカウントのAPIトークン">
+      </div>
+      <div class="form-group">
+        <label for="botId">Bot Account ID (数値)</label>
+        <input type="number" id="botId" name="botId" placeholder="例: 1234567">
+        <div class="note">※無限ループ防止用。Bot自身のIDを入力してください。</div>
+      </div>
+
+      <div class="section-title">Dify (Brain) 設定</div>
+      <div class="form-group">
+        <label for="difyKey">Dify API Key</label>
+        <input type="password" id="difyKey" name="difyKey" placeholder="app-...">
+      </div>
+      <div class="form-group">
+        <label for="difyUrl">Dify Base URL</label>
+        <input type="text" id="difyUrl" name="difyUrl" placeholder="https://api.dify.ai/v1">
+      </div>
+
+      <div class="section-title">Modal / Security</div>
+      <div class="form-group">
+        <label for="modalUrl">Modal Endpoint URL</label>
+        <input type="text" id="modalUrl" name="modalUrl" placeholder="https://user-app.modal.run">
+      </div>
+      <div class="form-group">
+        <label for="authToken">Internal Auth Token</label>
+        <input type="password" id="authToken" name="authToken" placeholder="Modalとの共通合言葉">
+      </div>
+
+      <button type="submit" class="action">設定を保存</button>
+      <div id="status" style="margin-top:10px; color: green; white-space: pre-wrap;"></div>
+    </form>
+
+    <script>
+      function handleFormSubmit(formObject) {
+        event.preventDefault();
+        const btn = document.querySelector('button.action');
+        btn.disabled = true;
+        btn.textContent = '保存中...';
+        
+        google.script.run
+          .withSuccessHandler(function(msg) {
+            document.getElementById('status').textContent = msg;
+            btn.textContent = '保存完了';
+            setTimeout(() => google.script.host.close(), 2000);
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('status').style.color = 'red';
+            document.getElementById('status').textContent = 'エラー: ' + err.message;
+            btn.disabled = false;
+            btn.textContent = '設定を保存';
+          })
+          .saveEnvironmentConfig(formObject);
+      }
+    </script>
+  </body>
+</html>

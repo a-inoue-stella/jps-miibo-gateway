@@ -1,0 +1,12 @@
+# Python / Modal
+__pycache__/
+*.py[cod]
+.venv
+venv/
+.env
+.DS_Store
+
+# GAS (clasp)
+.clasp.json
+creds.json
+.llm_context/
