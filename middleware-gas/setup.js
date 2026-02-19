@@ -82,9 +82,44 @@ function initializeLogSheets() {
     }
   });
 
-  if (createdCount > 0) {
-    ui.alert('✅ 初期セットアップ完了', `${createdCount} つのシートを作成しました。`, ui.ButtonSet.OK);
-  } else {
-    ui.alert('ℹ️ 完了', '必要なシートは既に存在します。', ui.ButtonSet.OK);
+  // --- INTERNAL_AUTH_TOKEN の自動生成 ---
+  const props = PropertiesService.getScriptProperties();
+  let authToken = props.getProperty('INTERNAL_AUTH_TOKEN');
+  let tokenGenerated = false;
+
+  if (!authToken) {
+    authToken = generateRandomToken(32);
+    props.setProperty('INTERNAL_AUTH_TOKEN', authToken);
+    tokenGenerated = true;
   }
+
+  if (createdCount > 0 || tokenGenerated) {
+    let msg = `✅ セットアップが完了しました。\n\n`;
+    if (createdCount > 0) msg += `・${createdCount} つのログシートを作成しました。\n`;
+    if (tokenGenerated) {
+      msg += `・セキュリティトークンを新規生成しました。\n\n`;
+      msg += `【重要：Modalへの設定用】\n`;
+      msg += `以下のトークンをModalのSecret(INTERNAL_AUTH_TOKEN)に設定してください：\n`;
+      msg += `--------------------------------\n`;
+      msg += `${authToken}\n`;
+      msg += `--------------------------------`;
+    } else {
+      msg += `・既存のセキュリティトークンを維持しました。`;
+    }
+    ui.alert('初期セットアップ完了', msg, ui.ButtonSet.OK);
+  } else {
+    ui.alert('ℹ️ 完了', 'シートおよびトークンは既に存在します。内容を確認したい場合はスクリプトプロパティを確認してください。', ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * ランダムな文字列を生成する
+ */
+function generateRandomToken(length) {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let res = "";
+  for (let i = 0; i < length; i++) {
+    res += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return res;
 }
