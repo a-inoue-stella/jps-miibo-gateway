@@ -3,7 +3,7 @@
  * （GASのメモリ不足を防ぐため、画像データ自体は送らない）
  */
 function callModalToProcessImage(platform, messageOrFileId, userId, roomId = null) {
-  
+
   let payload = {
     "user": userId,
     "source": platform // 'line' or 'chatwork'
@@ -14,17 +14,20 @@ function callModalToProcessImage(platform, messageOrFileId, userId, roomId = nul
     if (platform === 'line') {
       // LINEは ID だけ送れば、Modal側(Python)でダウンロードできる
       payload.id = messageOrFileId;
-    } 
+    }
     // --- B. Chatworkの場合 ---
     else if (platform === 'chatwork') {
       if (!roomId) throw new Error("Chatwork requires roomId.");
       // Chatworkは認証付きURLを発行して、それを送る
       const downloadUrl = getChatworkDownloadUrl(roomId, messageOrFileId);
       payload.url = downloadUrl;
-    } 
+    }
     else {
       throw new Error(`Unknown platform: ${platform}`);
     }
+
+    // セキュリティトークンの追加
+    payload.auth_token = CONFIG.INTERNAL_AUTH_TOKEN;
 
     // Modalへ送信
     const options = {
@@ -32,7 +35,7 @@ function callModalToProcessImage(platform, messageOrFileId, userId, roomId = nul
       'contentType': 'application/json',
       'payload': JSON.stringify(payload),
       'muteHttpExceptions': true,
-      'timeoutSeconds': 120 // Python側でのDL時間を考慮して長めに
+      'timeoutSeconds': 120
     };
 
     const response = UrlFetchApp.fetch(CONFIG.MODAL_ENDPOINT_URL, options);
@@ -45,7 +48,12 @@ function callModalToProcessImage(platform, messageOrFileId, userId, roomId = nul
     }
 
     const json = JSON.parse(text);
-    return json.dify_file_id;
+    if (json.status === 'success') {
+      return json.base64_image;
+    } else {
+      logError('ModalClient', userId, `Modal Logic Error: ${json.error}`);
+      return null;
+    }
 
   } catch (e) {
     logError('ModalClient', userId, e);
@@ -62,10 +70,10 @@ function getChatworkDownloadUrl(roomId, fileId) {
     'headers': { 'X-ChatWorkToken': CONFIG.CHATWORK_API_TOKEN },
     'method': 'get'
   });
-  
+
   const json = JSON.parse(response.getContentText());
   if (!json.download_url) throw new Error("Failed to get Chatwork download URL.");
-  
+
   return json.download_url;
 }
 
