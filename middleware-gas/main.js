@@ -66,16 +66,10 @@ function handleLineEvents(json) {
 
       // --- A. 画像が送られてきた場合 ---
       if (messageType === 'image') {
-        // Modalへ処理委譲 (modal_client.js) -> Base64画像を取得
-        const base64Image = callModalToProcessImage('line', messageId, userId);
-
-        if (base64Image) {
-          // 画像をキャッシュに保存（有効期限10分）
-          cache.put('PENDING_IMAGE_' + userId, base64Image, 600);
-          replyToLine(replyToken, "画像を読み込みました。\n続けて、どのようなトラブルか状況を教えてください。");
-        } else {
-          replyToLine(replyToken, "⚠️ 画像の読み込みに失敗しました。もう一度試すか、テキストで詳しく説明してください。");
-        }
+        // 画像IDをキャッシュに保存（有効期限10分）
+        // ※Base64データは大きすぎてキャッシュ(100KB制限)に入らないため、IDのみを保持する
+        cache.put('PENDING_LINE_IMAGE_ID_' + userId, messageId, 600);
+        replyToLine(replyToken, "画像を読み込みました。\n続けて、どのようなトラブルか状況を教えてください。");
       }
 
       // --- B. テキストが送られてきた場合 ---
@@ -83,13 +77,21 @@ function handleLineEvents(json) {
         const userQuery = event.message.text;
 
         // 直前の画像があるか確認
-        const pendingImage = cache.get('PENDING_IMAGE_' + userId);
-        if (pendingImage) {
-          cache.remove('PENDING_IMAGE_' + userId);
+        const pendingImageId = cache.get('PENDING_LINE_IMAGE_ID_' + userId);
+        let base64Image = null;
+
+        if (pendingImageId) {
+          // テキストが来たタイミングで初めてModalを呼び出し、Base64を取得する
+          base64Image = callModalToProcessImage('line', pendingImageId, userId);
+          cache.remove('PENDING_LINE_IMAGE_ID_' + userId);
+
+          if (!base64Image) {
+            console.warn("Failed to fetch pending image from Modal.");
+          }
         }
 
         // miiboへ問い合わせ
-        const answer = callMiiboApi(userId, userQuery, pendingImage);
+        const answer = callMiiboApi(userId, userQuery, base64Image);
 
         // ★修正: ここでMarkdown整形関数を通す
         const formattedAnswer = cleanMarkdownForLine(answer);
@@ -98,7 +100,7 @@ function handleLineEvents(json) {
         replyToLine(replyToken, formattedAnswer);
 
         // ログ保存
-        logConversation('LINE', userId, 'miibo-session', userQuery, answer, pendingImage ? 'image_attached' : '');
+        logConversation('LINE', userId, 'miibo-session', userQuery, answer, base64Image ? 'image_attached' : '');
       }
 
       // --- C. その他（スタンプなど） ---
@@ -296,18 +298,23 @@ function showLineLoadingAnimation(userId) {
 function replyToLine(replyToken, text) {
   if (!text) text = " "; // 空文字エラー防止
 
-  // ★修正: 正しいURL形式に変更
-  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
-    'headers': {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CONFIG.LINE_ACCESS_TOKEN}`
-    },
-    'method': 'post',
-    'payload': JSON.stringify({
-      replyToken: replyToken,
-      messages: [{ type: 'text', text: text }]
-    })
-  });
+  // ★修正: muteHttpExceptionsを有効化し、トークン無効によるエラーでスクリプトが停止しないようにする
+  try {
+    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+      'headers': {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CONFIG.LINE_ACCESS_TOKEN}`
+      },
+      'method': 'post',
+      'payload': JSON.stringify({
+        replyToken: replyToken,
+        messages: [{ type: 'text', text: text }]
+      }),
+      'muteHttpExceptions': true
+    });
+  } catch (e) {
+    console.warn("Reply to LINE failed:", e);
+  }
 }
 
 /**
