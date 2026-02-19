@@ -9,18 +9,18 @@
  */
 function runSystemDiagnostics() {
   console.log("=== 🏥 システム診断を開始します ===");
-  
+
   const results = {
     config: testConfiguration(),
     spreadsheet: testSpreadsheetAccess(),
-    dify: testDifyConnection()
+    miibo: testMiiboConnection()
   };
 
   console.log("=== 📊 診断結果サマリー ===");
   console.log(`1. 設定値ロード: ${results.config ? '✅ OK' : '❌ NG'}`);
   console.log(`2. ログシート接続: ${results.spreadsheet ? '✅ OK' : '❌ NG'}`);
-  console.log(`3. AIサーバー接続: ${results.dify ? '✅ OK' : '❌ NG'}`);
-  
+  console.log(`3. AIサーバー接続: ${results.miibo ? '✅ OK' : '❌ NG'}`);
+
   if (results.config && results.spreadsheet && results.dify) {
     console.log("✨ 基本システムは正常です。Webhook設定や通信経路の問題の可能性があります。");
   } else {
@@ -35,20 +35,20 @@ function testConfiguration() {
   console.log("\n[Test 1] 設定値の確認...");
   try {
     const props = PropertiesService.getScriptProperties();
-    const difyKey = props.getProperty('DIFY_API_KEY');
-    const difyUrl = props.getProperty('DIFY_BASE_URL');
+    const miiboKey = props.getProperty('MIIBO_API_KEY');
+    const miiboAgentId = props.getProperty('MIIBO_AGENT_ID');
     const botId = props.getProperty('BOT_ACCOUNT_ID');
-    
-    if (!difyKey || !difyUrl) {
-      console.error("❌ エラー: DIFY_API_KEY または DIFY_BASE_URL が設定されていません。");
+
+    if (!miiboKey || !miiboAgentId) {
+      console.error("❌ エラー: MIIBO_API_KEY または MIIBO_AGENT_ID が設定されていません。");
       return false;
     }
-    
+
     // Bot IDのチェックを追加
     if (!botId) {
-       console.error("❌ エラー: BOT_ACCOUNT_ID が設定されていません。Chatwork連携に必須です。");
-       console.error("   対策: スクリプトプロパティに、Bot自身のChatworkアカウントID（数字）を設定してください。");
-       return false;
+      console.error("❌ エラー: BOT_ACCOUNT_ID が設定されていません。Chatwork連携に必須です。");
+      console.error("   対策: スクリプトプロパティに、Bot自身のChatworkアカウントID（数字）を設定してください。");
+      return false;
     }
 
     console.log(`ℹ️ Dify URL: ${difyUrl}`);
@@ -72,7 +72,7 @@ function testSpreadsheetAccess() {
       console.error("❌ エラー: スプレッドシートが見つかりません。このスクリプトはコンテナバインドされていますか？");
       return false;
     }
-    
+
     // エラーログシートへの書き込みテスト
     // ※ logger.js の関数を直接呼ぶ
     if (typeof logError !== 'function') {
@@ -91,33 +91,32 @@ function testSpreadsheetAccess() {
 }
 
 /**
- * 診断3: Dify APIとの疎通テスト
+ * 診断3: miibo APIとの疎通テスト
  */
-function testDifyConnection() {
-  console.log("\n[Test 3] Dify API 接続テスト...");
+function testMiiboConnection() {
+  console.log("\n[Test 3] miibo API 接続テスト...");
   try {
-    // 実際にAPIを叩いてみる（適当な挨拶を送る）
     const userId = "debug_user_001";
-    const message = "これは接続テストです。応答してください。";
-    
-    if (typeof callDifyChat !== 'function') {
-      console.error("❌ エラー: callDifyChat 関数が見つかりません。");
+    const message = "接続テストです。";
+
+    if (typeof callMiiboApi !== 'function') {
+      console.error("❌ エラー: callMiiboApi 関数が見つかりません。");
       return false;
     }
 
-    console.log("ℹ️ Difyへ送信中...");
-    const response = callDifyChat(userId, message);
-    
+    console.log("ℹ️ miiboへ送信中...");
+    const response = callMiiboApi(userId, message);
+
     if (!response || response.startsWith("⚠️")) {
-      console.error(`❌ エラー: Difyからの応答が異常です -> ${response}`);
+      console.error(`❌ エラー: miiboからの応答が異常です -> ${response}`);
       return false;
     }
 
-    console.log(`✅ Difyからの応答: "${response}"`);
+    console.log(`✅ miiboからの応答: "${response}"`);
     return true;
 
   } catch (e) {
-    console.error("❌ エラー: Difyへの接続中に例外が発生しました。", e);
+    console.error("❌ エラー: miiboへの接続中に例外が発生しました。", e);
     return false;
   }
 }
@@ -128,7 +127,7 @@ function testDifyConnection() {
  */
 function simulateLineWebhook() {
   console.log("\n[Simulation] LINE Webhook 受信テスト...");
-  
+
   // テスト用のダミーイベントデータ
   const dummyEvent = {
     "destination": "xxxxxxxxxx",
@@ -164,7 +163,7 @@ function simulateLineWebhook() {
   try {
     // doPostを直接呼ぶと return 値が ContentOutput になるため、実行ログでエラーが出なければOK
     console.log("ℹ️ handleLineEvents を呼び出します...");
-    
+
     // handleLineEvents は main.js にある関数
     if (typeof handleLineEvents === 'function') {
       handleLineEvents(dummyEvent);
@@ -188,10 +187,10 @@ function simulateLineWebhook() {
  */
 function simulateChatworkWebhook() {
   console.log("\n[Simulation] Chatwork Webhook 受信テスト...");
-  
+
   // プロパティからボットIDを取得（自分自身へのメンション判定用）
   const props = PropertiesService.getScriptProperties();
-  const botId = Number(props.getProperty('BOT_ACCOUNT_ID')) || 123456; 
+  const botId = Number(props.getProperty('BOT_ACCOUNT_ID')) || 123456;
 
   console.log('ℹ️ Bot ID used for test: ' + botId);
 
@@ -213,12 +212,12 @@ function simulateChatworkWebhook() {
 
   try {
     console.log("ℹ️ handleChatworkEvent を呼び出します...");
-    
+
     // main.js の handleChatworkEvent を使用
-    // ※注意: 実際にDifyへ飛び、Chatworkへ返信しようとします（UrlFetchが走る）
+    // ※注意: 実際にmiiboへ飛び、Chatworkへ返信しようとします（UrlFetchが走る）
     // 実際のChatworkルームが存在しないIDの場合、返信部分はエラーになりますが、
     // ログ保存(logConversation)までは進むはずです。
-    
+
     if (typeof handleChatworkEvent === 'function') {
       handleChatworkEvent(dummyPayload);
       console.log("✅ Chatwork処理関数が終了しました。");

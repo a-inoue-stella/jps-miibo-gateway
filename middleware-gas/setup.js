@@ -30,23 +30,23 @@ function showConfigDialog() {
 function saveEnvironmentConfig(formObject) {
   const props = PropertiesService.getScriptProperties();
   const currentProps = props.getProperties();
-  
+
   // 入力があった項目のみ更新（空欄の場合は既存値を維持）
   const newProps = { ...currentProps };
-  
+
   if (formObject.lineToken) newProps['LINE_ACCESS_TOKEN'] = formObject.lineToken;
   if (formObject.chatworkToken) newProps['CHATWORK_API_TOKEN'] = formObject.chatworkToken;
-  
+
   // ★追加: Bot IDの保存
   if (formObject.botId) newProps['BOT_ACCOUNT_ID'] = formObject.botId;
 
-  if (formObject.difyKey) newProps['DIFY_API_KEY'] = formObject.difyKey;
-  if (formObject.difyUrl) newProps['DIFY_BASE_URL'] = formObject.difyUrl;
+  if (formObject.miiboKey) newProps['MIIBO_API_KEY'] = formObject.miiboKey;
+  if (formObject.miiboAgentId) newProps['MIIBO_AGENT_ID'] = formObject.miiboAgentId;
   if (formObject.authToken) newProps['INTERNAL_AUTH_TOKEN'] = formObject.authToken;
   if (formObject.modalUrl) newProps['MODAL_ENDPOINT_URL'] = formObject.modalUrl;
 
   props.setProperties(newProps);
-  
+
   return '✅ 設定を保存しました。\n次回実行時より反映されます。';
 }
 
@@ -60,7 +60,7 @@ function initializeLogSheets() {
   const sheetDefinitions = [
     {
       name: 'Conversation_Log',
-      headers: ['Timestamp', 'Platform', 'UserID', 'SessionID', 'UserQuery', 'AIAnswer', 'DifyFileID'],
+      headers: ['Timestamp', 'Platform', 'UserID', 'SessionID', 'UserQuery', 'AIAnswer', 'ImageAttached'],
       description: '会話ログ'
     },
     {

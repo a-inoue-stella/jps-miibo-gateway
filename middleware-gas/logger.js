@@ -14,14 +14,14 @@
 function logConversation(platform, userId, sessionId, userQuery, aiAnswer, fileId = '') {
   const sheetName = CONFIG.LOG_SHEET_CONVERSATION;
   const now = new Date();
-  
+
   // ★修正: 個人情報(PII)をマスキング処理
   // ユーザーの質問だけでなく、AIがオウム返しした場合に備えて回答もマスクする
   const safeQuery = maskPII(userQuery);
   const safeAnswer = maskPII(aiAnswer);
 
   // 書き込みデータ
-  // [Timestamp, Platform, UserID, SessionID, UserQuery, AIAnswer, DifyFileID]
+  // [Timestamp, Platform, UserID, SessionID, UserQuery, AIAnswer, ImageAttached]
   const rowData = [
     now,
     platform,
@@ -44,7 +44,7 @@ function logConversation(platform, userId, sessionId, userQuery, aiAnswer, fileI
 function logError(module, userId, error) {
   const sheetName = CONFIG.LOG_SHEET_ERROR;
   const now = new Date();
-  
+
   const errorMessage = (error instanceof Error) ? error.message : error;
   const stackTrace = (error instanceof Error) ? error.stack : '';
 
@@ -77,7 +77,7 @@ ${errorMessage}
 ■ スタックトレース:
 ${stackTrace}
     `;
-    
+
     // メール送信（割り当て制限に注意：1日100通まで）
     // エラーが頻発した場合のスパム防止のため、開発中はコメントアウトしても良い
     MailApp.sendEmail({
@@ -95,13 +95,13 @@ ${stackTrace}
  */
 function appendRowWithLock(sheetName, rowData) {
   const lock = LockService.getScriptLock();
-  
+
   try {
     // 最大10秒間ロック取得を試行
     if (lock.tryLock(10000)) {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       let sheet = ss.getSheetByName(sheetName);
-      
+
       // シートがない場合の安全策（setup.jsで作成済みのはずだが念のため）
       if (!sheet) {
         sheet = ss.insertSheet(sheetName);

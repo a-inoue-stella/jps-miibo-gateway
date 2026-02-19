@@ -3,7 +3,7 @@
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  
+
   ui.createMenu('🚀 システム管理')
     .addItem('1. 設定値のチェック', 'checkConfigWithUi')
     .addItem('2. 【初回のみ】ログシート初期構築', 'initializeLogSheets')
@@ -19,14 +19,14 @@ function onOpen() {
 function checkConfigWithUi() {
   // config.gs の checkConfig を呼び出す（コンソール出力用）
   checkConfig();
-  
+
   // UIにも表示
   const ui = SpreadsheetApp.getUi();
   const missing = [];
   if (!CONFIG.LINE_ACCESS_TOKEN) missing.push('LINE_ACCESS_TOKEN');
-  if (!CONFIG.DIFY_API_KEY) missing.push('DIFY_API_KEY');
+  if (!CONFIG.MIIBO_API_KEY) missing.push('MIIBO_API_KEY');
   if (!CONFIG.MODAL_ENDPOINT_URL) missing.push('MODAL_ENDPOINT_URL');
-  
+
   if (missing.length > 0) {
     ui.alert('⚠️ 設定不足', '以下の項目が未設定です:\n' + missing.join('\n'), ui.ButtonSet.OK);
   } else {
@@ -59,15 +59,15 @@ function cleanupOldProperties() {
   const allData = props.getProperties();
   const now = new Date().getTime();
   const EXPIRE_MS = 30 * 24 * 60 * 60 * 1000; // 30日
-  
+
   let deletedCount = 0;
-  
+
   // 保存されている全データをチェック
   for (let key in allData) {
     // タイムスタンプキー（LAST_ACCESS_...）を探す
     if (key.startsWith('LAST_ACCESS_')) {
       const lastTime = parseInt(allData[key]);
-      
+
       // 期限切れなら削除
       if ((now - lastTime) > EXPIRE_MS) {
         const userId = key.replace('LAST_ACCESS_', '');
@@ -77,6 +77,6 @@ function cleanupOldProperties() {
       }
     }
   }
-  
+
   console.log(`🧹 メンテナンス完了: ${deletedCount} 件の古いデータを削除しました。`);
 }
