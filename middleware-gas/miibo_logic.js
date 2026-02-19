@@ -1,43 +1,33 @@
 /**
  * miibo APIを呼び出してチャットを行う関数
- * @param {string} userId - ユーザーID (cw_xxxx or line_xxxx)
- * @param {string} query - ユーザーからのテキストメッセージ
- * @param {string} base64Image - 画像がある場合のBase64データ (ない場合はnull)
+ * @param {string} uid - ユーザー識別子
+ * @param {string} message - 発言内容
+ * @param {string} base64Image - 画像データ (null可)
  * @returns {string} - miiboからの回答テキスト
  */
-function callMiiboChat(userId, query, base64Image = null) {
-    const props = PropertiesService.getScriptProperties();
-    const uId = String(userId).trim();
-    const sessionKey = 'SESSION_' + uId;
-
-    // 会話リセット判定
-    const q = (query || "").trim().toLowerCase();
-    if (['リセット', 'clear', 'reset', '終了'].includes(q)) {
-        props.deleteProperty(sessionKey);
-        return "🗑️ 会話の記録をリセットしました。";
-    }
-
-    const endpoint = "https://api-mebo.dev/v1/chat";
+function callMiiboApi(uid, message, base64Image = null) {
+    const agentId = CONFIG.MIIBO_AGENT_ID;
+    const endpoint = `https://api-mebo.dev/api/v1/agents/${agentId}/chat`;
 
     const payload = {
         "api_key": CONFIG.MIIBO_API_KEY,
-        "agent_id": CONFIG.MIIBO_AGENT_ID,
-        "utterance": query || "画像を解析してください",
-        "uid": uId,
-        "at": new Date().toISOString()
+        "agent_id": agentId,
+        "uid": String(uid),
+        "utterance": message || "画像を解析してください"
     };
 
-    // 画像がある場合は拡張パラメータとして追加 (miiboの仕様に合わせる)
     if (base64Image) {
-        // miiboの画像入力仕様に基づき、画像データをセット
-        // ※ エージェントの設定で画像認識が有効である必要があります
-        payload.image_data = base64Image;
+        payload.base64_image = base64Image;
     }
+
+    // デバッグ用ログ: Payloadサイズの出力
+    const payloadStr = JSON.stringify(payload);
+    console.log(`Payload Size: ${payloadStr.length} chars`);
 
     const options = {
         "method": "post",
         "contentType": "application/json",
-        "payload": JSON.stringify(payload),
+        "payload": payloadStr,
         "muteHttpExceptions": true
     };
 
@@ -45,17 +35,30 @@ function callMiiboChat(userId, query, base64Image = null) {
         const response = UrlFetchApp.fetch(endpoint, options);
         const code = response.getResponseCode();
         const content = response.getContentText();
-        const json = JSON.parse(content);
+
+        let json;
+        try {
+            json = JSON.parse(content);
+        } catch (parseErr) {
+            console.error("JSON Parse Error:", content);
+            return "⚠️ サーバーからの応答を解析できませんでした。";
+        }
 
         if (code !== 200) {
             console.error(`miibo API Error: ${code}`, content);
             return `⚠️ miiboエラーが発生しました (${code})`;
         }
 
-        return json.bestResponse.utterance;
+        // レスポンス形式の確認
+        if (json && json.bestResponse && json.bestResponse.utterance) {
+            return json.bestResponse.utterance;
+        } else {
+            console.error("Unexpected miibo response format:", content);
+            return "⚠️ miiboから有効な回答が得られませんでした。";
+        }
 
     } catch (e) {
         console.error("Call miibo Failed:", e);
-        return "⚠️ システムエラーが発生しました。";
+        return "⚠️ システムエラーが発生しました。時間を置いて再度お試しください。";
     }
 }

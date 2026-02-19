@@ -89,7 +89,7 @@ function handleLineEvents(json) {
         }
 
         // miiboへ問い合わせ
-        const answer = callMiiboChat(userId, userQuery, pendingImage);
+        const answer = callMiiboApi(userId, userQuery, pendingImage);
 
         // ★修正: ここでMarkdown整形関数を通す
         const formattedAnswer = cleanMarkdownForLine(answer);
@@ -209,7 +209,7 @@ function handleChatworkEvent(json) {
     }
 
     // 7. miiboへ問い合わせ
-    const answer = callMiiboChat(userId, cleanBody, base64Image);
+    const answer = callMiiboApi(String(accountId), cleanBody, base64Image);
 
     // 8. 結果を返信 (Markdown簡易変換あり)
     if (answer) {
