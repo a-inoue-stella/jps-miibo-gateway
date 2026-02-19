@@ -7,7 +7,7 @@
  */
 function callMiiboApi(uid, message, base64Image = null) {
     const agentId = CONFIG.MIIBO_AGENT_ID;
-    const endpoint = `https://api-mebo.dev/api/v1/agents/${agentId}/chat`;
+    const endpoint = 'https://api-mebo.dev/api';
 
     const payload = {
         "api_key": CONFIG.MIIBO_API_KEY,
