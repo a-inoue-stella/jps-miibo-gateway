@@ -99,8 +99,11 @@ function handleLineEvents(json) {
         // 整形済みの回答を返信
         replyToLine(replyToken, formattedAnswer);
 
+        // ユーザー表示名を取得
+        const userName = getLineDisplayName(userId);
+
         // ログ保存
-        logConversation('LINE', userId, 'miibo-session', userQuery, answer, base64Image ? 'image_attached' : '');
+        logConversation('LINE', userId, userName, 'miibo-session', userQuery, answer, base64Image ? 'image_attached' : '');
       }
 
       // --- C. その他（スタンプなど） ---
@@ -220,7 +223,8 @@ function handleChatworkEvent(json) {
 
       // ★追加: 会話ログを記録
       if (typeof logConversation === 'function') {
-        logConversation('Chatwork', userId, 'miibo-session', cleanBody, answer, base64Image ? 'image_attached' : '');
+        const userName = getChatworkDisplayName(accountId);
+        logConversation('Chatwork', userId, userName, 'miibo-session', cleanBody, answer, base64Image ? 'image_attached' : '');
       }
     }
 
@@ -267,6 +271,49 @@ function safeSendMessageToChatwork(roomId, text) {
 // ==================================================
 // 3. Helper Functions
 // ==================================================
+
+/**
+ * LINEユーザーの表示名を取得する
+ * @param {string} userId - LINE ユーザーID
+ * @returns {string} 表示名（取得失敗時は '不明'）
+ */
+function getLineDisplayName(userId) {
+  try {
+    const res = UrlFetchApp.fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+      'headers': {
+        'Authorization': `Bearer ${CONFIG.LINE_ACCESS_TOKEN}`
+      },
+      'method': 'get',
+      'muteHttpExceptions': true
+    });
+    const json = JSON.parse(res.getContentText());
+    return json.displayName || '不明';
+  } catch (e) {
+    console.warn('Failed to get LINE display name:', e);
+    return '不明';
+  }
+}
+
+/**
+ * Chatworkユーザーの表示名を取得する
+ * @param {number|string} accountId - Chatwork アカウントID
+ * @returns {string} 表示名（取得失敗時は '不明'）
+ */
+function getChatworkDisplayName(accountId) {
+  try {
+    const res = UrlFetchApp.fetch(`https://api.chatwork.com/v2/contacts`, {
+      'headers': { 'X-ChatWorkToken': CONFIG.CHATWORK_API_TOKEN },
+      'method': 'get',
+      'muteHttpExceptions': true
+    });
+    const contacts = JSON.parse(res.getContentText());
+    const user = contacts.find(c => c.account_id === Number(accountId));
+    return user ? user.name : '不明';
+  } catch (e) {
+    console.warn('Failed to get Chatwork display name:', e);
+    return '不明';
+  }
+}
 
 /**
  * LINEにローディングアニメーションを表示する（修正版）

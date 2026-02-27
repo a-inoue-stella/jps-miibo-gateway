@@ -21,7 +21,8 @@ const CONFIG = {
   BOT_ACCOUNT_ID: Number(PROPS.getProperty('BOT_ACCOUNT_ID')) || 0,
 
   // ログ設定
-  LOG_SHEET_CONVERSATION: 'Conversation_Log',
+  LOG_SHEET_LINE: 'Conversation_Log_LINE',
+  LOG_SHEET_CHATWORK: 'Conversation_Log_Chatwork',
   LOG_SHEET_ERROR: 'System_Error_Log'
 };
 

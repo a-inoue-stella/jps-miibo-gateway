@@ -6,13 +6,15 @@
  * 会話ログをスプレッドシートに記録する（PIIマスク適用済み）
  * @param {string} platform - 'LINE' or 'Chatwork'
  * @param {string} userId - ユーザーID
+ * @param {string} userName - ユーザー表示名
  * @param {string} sessionId - Difyの会話ID
  * @param {string} userQuery - ユーザーの質問
  * @param {string} aiAnswer - AIの回答
  * @param {string} fileId - (Optional) 画像ファイルID
  */
-function logConversation(platform, userId, sessionId, userQuery, aiAnswer, fileId = '') {
-  const sheetName = CONFIG.LOG_SHEET_CONVERSATION;
+function logConversation(platform, userId, userName, sessionId, userQuery, aiAnswer, fileId = '') {
+  // プラットフォームに応じてシートを切り替え
+  const sheetName = (platform === 'LINE') ? CONFIG.LOG_SHEET_LINE : CONFIG.LOG_SHEET_CHATWORK;
   const now = new Date();
 
   // ★修正: 個人情報(PII)をマスキング処理
@@ -21,11 +23,12 @@ function logConversation(platform, userId, sessionId, userQuery, aiAnswer, fileI
   const safeAnswer = maskPII(aiAnswer);
 
   // 書き込みデータ
-  // [Timestamp, Platform, UserID, SessionID, UserQuery, AIAnswer, ImageAttached]
+  // [Timestamp, Platform, UserID, UserName, SessionID, UserQuery, AIAnswer, ImageAttached]
   const rowData = [
     now,
     platform,
     userId,
+    userName,
     sessionId,
     safeQuery,   // マスク済みデータ
     safeAnswer,  // マスク済みデータ

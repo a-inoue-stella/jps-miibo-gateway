@@ -221,7 +221,7 @@ function simulateChatworkWebhook() {
     if (typeof handleChatworkEvent === 'function') {
       handleChatworkEvent(dummyPayload);
       console.log("✅ Chatwork処理関数が終了しました。");
-      console.log("👉 スプレッドシートの「Conversation_Log」を確認してください。");
+      console.log("👉 スプレッドシートの「Conversation_Log_LINE」「Conversation_Log_Chatwork」を確認してください。");
       console.log("   (APIエラーがログに出ていれば、ロジック自体は動いています)");
     } else {
       console.error("❌ エラー: handleChatworkEvent が見つかりません。");

@@ -59,9 +59,14 @@ function initializeLogSheets() {
 
   const sheetDefinitions = [
     {
-      name: 'Conversation_Log',
-      headers: ['Timestamp', 'Platform', 'UserID', 'SessionID', 'UserQuery', 'AIAnswer', 'ImageAttached'],
-      description: '会話ログ'
+      name: 'Conversation_Log_LINE',
+      headers: ['Timestamp', 'Platform', 'UserID', 'UserName', 'SessionID', 'UserQuery', 'AIAnswer', 'ImageAttached'],
+      description: 'LINE会話ログ'
+    },
+    {
+      name: 'Conversation_Log_Chatwork',
+      headers: ['Timestamp', 'Platform', 'UserID', 'UserName', 'SessionID', 'UserQuery', 'AIAnswer', 'ImageAttached'],
+      description: 'Chatwork会話ログ'
     },
     {
       name: 'System_Error_Log',
