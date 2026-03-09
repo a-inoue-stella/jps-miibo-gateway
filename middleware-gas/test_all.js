@@ -76,6 +76,88 @@ function assertNoThrow(name, fn) {
   }
 }
 
+/**
+ * 例外が発生することを確認
+ */
+function assertThrows(name, fn) {
+  try {
+    fn();
+    TEST_RESULTS.failed++;
+    const msg = `  ❌ ${name}  — expected an error but none was thrown`;
+    console.error(msg);
+    TEST_RESULTS.errors.push(msg);
+  } catch (e) {
+    TEST_RESULTS.passed++;
+    console.log(`  ✅ ${name}  (threw: ${e.message})`);
+  }
+}
+
+/**
+ * assertNull — 値が null であることを確認
+ */
+function assertNull(name, value) {
+  if (value === null) {
+    TEST_RESULTS.passed++;
+    console.log(`  ✅ ${name}`);
+  } else {
+    TEST_RESULTS.failed++;
+    const msg = `  ❌ ${name}  — expected null, got: ${JSON.stringify(value)}`;
+    console.error(msg);
+    TEST_RESULTS.errors.push(msg);
+  }
+}
+
+// --- UrlFetchApp モック ---
+
+/**
+ * UrlFetchApp.fetch をモック化するヘルパー
+ * @param {number} code - レスポンスコード
+ * @param {string|object} body - レスポンスボディ（オブジェクトの場合は JSON.stringify される）
+ * @param {function} [interceptor] - 呼び出し時に (url, options) を受け取るコールバック
+ * @returns {function} モック解除関数
+ */
+function mockUrlFetchApp(code, body, interceptor) {
+  const original = UrlFetchApp.fetch;
+  const bodyStr = typeof body === 'object' ? JSON.stringify(body) : body;
+
+  UrlFetchApp.fetch = function (url, options) {
+    if (interceptor) interceptor(url, options);
+    return {
+      getResponseCode: () => code,
+      getContentText: () => bodyStr
+    };
+  };
+
+  return function restore() {
+    UrlFetchApp.fetch = original;
+  };
+}
+
+/**
+ * UrlFetchApp.fetch を順番に異なるレスポンスを返すようモック化する
+ * （getChatworkDownloadUrl → Modal本体 の2回呼び出し用）
+ * @param {Array<{code: number, body: string|object}>} responses
+ * @returns {function} モック解除関数
+ */
+function mockUrlFetchAppSequence(responses) {
+  const original = UrlFetchApp.fetch;
+  let callIndex = 0;
+
+  UrlFetchApp.fetch = function (url, options) {
+    const r = responses[callIndex] || responses[responses.length - 1];
+    callIndex++;
+    const bodyStr = typeof r.body === 'object' ? JSON.stringify(r.body) : r.body;
+    return {
+      getResponseCode: () => r.code,
+      getContentText: () => bodyStr
+    };
+  };
+
+  return function restore() {
+    UrlFetchApp.fetch = original;
+  };
+}
+
 // ==================================================
 // メインエントリーポイント
 // ==================================================
@@ -95,6 +177,7 @@ function runAllTests() {
   testMaskPII();
   testChatworkNoiseRemoval();
   testNullGuards();
+  testModalClientUnit();
 
   // --- Integration Tests（API接続が必要） ---
   testMiiboApiConnection();
@@ -130,6 +213,7 @@ function runUnitTestsOnly() {
   testMaskPII();
   testChatworkNoiseRemoval();
   testNullGuards();
+  testModalClientUnit();
 
   console.log("\n========================================");
   console.log(`📊 合格: ${TEST_RESULTS.passed} / 不合格: ${TEST_RESULTS.failed}`);
@@ -434,6 +518,137 @@ function testLogConversationForReset() {
     }
   } catch (e) {
     console.warn("  ⚠️ ログシート確認スキップ:", e.message);
+  }
+}
+
+// ==================================================
+// Unit Test 7: modal_client.js
+// ==================================================
+
+function testModalClientUnit() {
+  console.log("\n[Unit Test 7] modal_client.js — callModalToProcessImage / getChatworkDownloadUrl");
+
+  // --- 7-1: LINE — 正常系 ---
+  {
+    const restore = mockUrlFetchApp(200, { status: 'success', base64_image: 'data:image/jpeg;base64,ABC==' });
+    try {
+      const result = callModalToProcessImage('line', 'msg_001', 'user_test_001');
+      assertEqual('LINE 正常レスポンスで base64_image が返る', result, 'data:image/jpeg;base64,ABC==');
+    } finally { restore(); }
+  }
+
+  // --- 7-2: LINE — ペイロード構造確認 ---
+  {
+    let captured = null;
+    const restore = mockUrlFetchApp(200, { status: 'success', base64_image: 'ok' }, function (url, opts) {
+      captured = JSON.parse(opts.payload);
+    });
+    try {
+      callModalToProcessImage('line', 'msg_002', 'user_test_002');
+      assertEqual('LINE ペイロードに source=line', captured.source, 'line');
+      assertEqual('LINE ペイロードに id=msg_002', captured.id, 'msg_002');
+      assertEqual('LINE ペイロードに user=user_test_002', captured.user, 'user_test_002');
+      assertTrue('LINE ペイロードに auth_token が存在', !!captured.auth_token);
+    } finally { restore(); }
+  }
+
+  // --- 7-3: Chatwork — roomId 未指定で例外 ---
+  {
+    assertThrows('Chatwork roomId なしでエラー', function () {
+      callModalToProcessImage('chatwork', 'file_001', 'user_cw');
+    });
+  }
+
+  // --- 7-4: Chatwork — 正常系（2段階モック: CW API → Modal API） ---
+  {
+    const restore = mockUrlFetchAppSequence([
+      { code: 200, body: { download_url: 'https://example.com/dl/file_001' } },
+      { code: 200, body: { status: 'success', base64_image: 'data:image/jpeg;base64,CWIMG==' } }
+    ]);
+    try {
+      const result = callModalToProcessImage('chatwork', 'file_001', 'user_cw', '12345');
+      assertEqual('Chatwork 正常レスポンスで base64_image が返る', result, 'data:image/jpeg;base64,CWIMG==');
+    } finally { restore(); }
+  }
+
+  // --- 7-5: 未知の platform でエラー（null 返却） ---
+  {
+    const result = callModalToProcessImage('slack', 'msg_001', 'user_test');
+    assertNull('未知 platform は null を返す', result);
+  }
+
+  // --- 7-6: HTTP 401 (Auth Error) → null ---
+  {
+    const restore = mockUrlFetchApp(401, { error: 'Unauthorized', status: 'failed', error_code: 'AUTH_FAILED' });
+    try {
+      const result = callModalToProcessImage('line', 'msg_001', 'user_test');
+      assertNull('HTTP 401 で null が返る', result);
+    } finally { restore(); }
+  }
+
+  // --- 7-7: HTTP 400 (Bad Request) → null ---
+  {
+    const restore = mockUrlFetchApp(400, { error: 'Missing param', status: 'failed', error_code: 'MISSING_PARAM' });
+    try {
+      const result = callModalToProcessImage('line', 'msg_001', 'user_test');
+      assertNull('HTTP 400 で null が返る', result);
+    } finally { restore(); }
+  }
+
+  // --- 7-8: HTTP 413 (Payload Too Large) → null ---
+  {
+    const restore = mockUrlFetchApp(413, { error: 'Too large', status: 'failed', error_code: 'PAYLOAD_TOO_LARGE' });
+    try {
+      const result = callModalToProcessImage('line', 'msg_001', 'user_test');
+      assertNull('HTTP 413 で null が返る', result);
+    } finally { restore(); }
+  }
+
+  // --- 7-9: HTTP 500 (Server Error) → null ---
+  {
+    const restore = mockUrlFetchApp(500, { error: 'Internal error', status: 'failed', error_code: 'INTERNAL_ERROR' });
+    try {
+      const result = callModalToProcessImage('line', 'msg_001', 'user_test');
+      assertNull('HTTP 500 で null が返る', result);
+    } finally { restore(); }
+  }
+
+  // --- 7-10: JSON パース失敗 → null ---
+  {
+    const restore = mockUrlFetchApp(200, 'this is not json {{{}');
+    try {
+      const result = callModalToProcessImage('line', 'msg_001', 'user_test');
+      assertNull('JSON パース失敗時に null が返る', result);
+    } finally { restore(); }
+  }
+
+  // --- 7-11: 成功だが status !== 'success' → null ---
+  {
+    const restore = mockUrlFetchApp(200, { status: 'error', error: 'Something went wrong' });
+    try {
+      const result = callModalToProcessImage('line', 'msg_001', 'user_test');
+      assertNull('status が success でない場合 null が返る', result);
+    } finally { restore(); }
+  }
+
+  // --- 7-12: getChatworkDownloadUrl — download_url が空 → 例外 ---
+  {
+    const restore = mockUrlFetchApp(200, { download_url: '' });
+    try {
+      assertThrows('CW download_url 空文字列でエラー', function () {
+        getChatworkDownloadUrl('12345', 'file_001');
+      });
+    } finally { restore(); }
+  }
+
+  // --- 7-13: getChatworkDownloadUrl — API エラー → 例外 ---
+  {
+    const restore = mockUrlFetchApp(403, 'Forbidden');
+    try {
+      assertThrows('CW File API が 403 でエラー', function () {
+        getChatworkDownloadUrl('12345', 'file_001');
+      });
+    } finally { restore(); }
   }
 }
 

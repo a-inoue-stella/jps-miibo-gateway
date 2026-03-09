@@ -30,28 +30,50 @@ function callModalToProcessImage(platform, messageOrFileId, userId, roomId = nul
     payload.auth_token = CONFIG.INTERNAL_AUTH_TOKEN;
 
     // Modalへ送信
+    // ※ GAS の UrlFetchApp は固定タイムアウト(約60秒)のため timeoutSeconds は指定不可
     const options = {
       'method': 'post',
       'contentType': 'application/json',
       'payload': JSON.stringify(payload),
-      'muteHttpExceptions': true,
-      'timeoutSeconds': 120
+      'muteHttpExceptions': true
     };
 
     const response = UrlFetchApp.fetch(CONFIG.MODAL_ENDPOINT_URL, options);
     const code = response.getResponseCode();
     const text = response.getContentText();
 
-    if (code !== 200) {
-      logError('ModalClient', userId, `Modal API Error (${code}): ${text}`);
+    // レスポンスの JSON パース
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (parseErr) {
+      logError('ModalClient', userId, `Modal Response Parse Error (HTTP ${code}): ${text.substring(0, 200)}`);
       return null;
     }
 
-    const json = JSON.parse(text);
+    // HTTP ステータスコードに応じたエラーハンドリング
+    if (code === 401) {
+      logError('ModalClient', userId, `Modal Auth Error: ${json.error || 'Unauthorized'}`);
+      return null;
+    }
+    if (code === 400) {
+      logError('ModalClient', userId, `Modal Bad Request: ${json.error || 'Invalid parameters'}`);
+      return null;
+    }
+    if (code === 413) {
+      logError('ModalClient', userId, `Modal Payload Too Large: ${json.error || 'Image too large'}`);
+      return null;
+    }
+    if (code !== 200) {
+      logError('ModalClient', userId, `Modal API Error (${code}): ${json.error || text.substring(0, 200)}`);
+      return null;
+    }
+
+    // 成功レスポンスの確認
     if (json.status === 'success') {
       return json.base64_image;
     } else {
-      logError('ModalClient', userId, `Modal Logic Error: ${json.error}`);
+      logError('ModalClient', userId, `Modal Logic Error: ${json.error || 'Unknown error'}`);
       return null;
     }
 
@@ -63,18 +85,25 @@ function callModalToProcessImage(platform, messageOrFileId, userId, roomId = nul
 
 /**
  * ChatworkのダウンロードURLを取得する（画像本体はDLしない）
+ * @param {string|number} roomId - チャットルームID
+ * @param {string|number} fileId - ファイルID
+ * @returns {string} ダウンロードURL
  */
 function getChatworkDownloadUrl(roomId, fileId) {
   const url = `https://api.chatwork.com/v2/rooms/${roomId}/files/${fileId}?create_download_url=1`;
   const response = UrlFetchApp.fetch(url, {
     'headers': { 'X-ChatWorkToken': CONFIG.CHATWORK_API_TOKEN },
-    'method': 'get'
+    'method': 'get',
+    'muteHttpExceptions': true
   });
 
+  const code = response.getResponseCode();
+  if (code !== 200) {
+    throw new Error(`Chatwork File API Error (${code}): ${response.getContentText().substring(0, 200)}`);
+  }
+
   const json = JSON.parse(response.getContentText());
-  if (!json.download_url) throw new Error("Failed to get Chatwork download URL.");
+  if (!json.download_url) throw new Error("Failed to get Chatwork download URL: download_url is empty.");
 
   return json.download_url;
 }
-
-// ※ getLineMessageContent は不要になったので削除してOKです
