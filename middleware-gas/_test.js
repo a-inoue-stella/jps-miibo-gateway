@@ -21,7 +21,7 @@ function runSystemDiagnostics() {
   console.log(`2. ログシート接続: ${results.spreadsheet ? '✅ OK' : '❌ NG'}`);
   console.log(`3. AIサーバー接続: ${results.miibo ? '✅ OK' : '❌ NG'}`);
 
-  if (results.config && results.spreadsheet && results.dify) {
+  if (results.config && results.spreadsheet && results.miibo) {
     console.log("✨ 基本システムは正常です。Webhook設定や通信経路の問題の可能性があります。");
   } else {
     console.error("⚠️ システム内部に問題が見つかりました。上記のNG項目を確認してください。");
@@ -51,7 +51,6 @@ function testConfiguration() {
       return false;
     }
 
-    console.log(`ℹ️ Dify URL: ${difyUrl}`);
     console.log(`ℹ️ Bot Account ID: ${botId}`);
     console.log("✅ 設定値は正常に読み込めました。");
     return true;

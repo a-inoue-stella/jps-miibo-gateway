@@ -48,16 +48,6 @@ function handleLineEvents(json) {
     const messageType = event.message.type;
     const messageId = event.message.id;
 
-    // リセット機能（強制終了）
-    if (messageType === 'text') {
-      const rawText = event.message.text.trim();
-      if (rawText === 'リセット' || rawText === 'クリア' || rawText === '終了') {
-        // AIに渡す前に、ここでリセット処理を実行して終了する
-        const resetMsg = callDifyChat(userId, rawText);
-        replyToLine(replyToken, resetMsg);
-        continue; // 次のイベントへ（AIの処理には進ませない）
-      }
-    }
     // ★ローディングアニメーションを表示
     showLineLoadingAnimation(userId);
 
@@ -75,6 +65,15 @@ function handleLineEvents(json) {
       // --- B. テキストが送られてきた場合 ---
       else if (messageType === 'text') {
         const userQuery = event.message.text;
+
+        // --- リセットコマンド判定 ---
+        if (isResetCommand(userQuery)) {
+          resetMiiboConversation(userId);
+          replyToLine(replyToken, '🔄 【システム】会話の履歴と設定を初期化しました。最初からご相談内容を入力してください。');
+          const userName = getLineDisplayName(userId);
+          logConversation('LINE', userId, userName, 'system-reset', '[システムコマンド: リセット]', '[履歴・ステート初期化完了]', '');
+          return;
+        }
 
         // 直前の画像があるか確認
         const pendingImageId = cache.get('PENDING_LINE_IMAGE_ID_' + userId);
@@ -158,6 +157,7 @@ function handleChatworkEvent(json) {
   const roomId = event.room_id;
   const messageId = event.message_id;
   const rawBody = event.body;
+  if (!rawBody) return; // bodyが空の場合は処理しない
 
   // Bot自身のIDを取得（プロパティになければAPIで自動取得して保存）
   // これにより設定の手間と事故を減らす
@@ -191,19 +191,19 @@ function handleChatworkEvent(json) {
   // リプライ用タグ
   const replyTag = `[rp aid=${accountId} to=${roomId}-${messageId}]`;
 
-  // 画像IDがあるか確認
-  const fileIdMatch = rawBody.match(/\[download:(\d+)\]/);
-  const chatworkFileId = fileIdMatch ? fileIdMatch[1] : null;
-
   try {
-    // 5. リセット判定
-    const cmd = cleanBody.toLowerCase();
-    if (cmd === 'リセット' || cmd === 'clear' || cmd === 'reset') {
-      const resetMsg = callDifyChat(userId, 'リセット');
-      safeSendMessageToChatwork(roomId, `${replyTag}${resetMsg}`);
+    // --- リセットコマンド判定 ---
+    if (isResetCommand(cleanBody)) {
+      resetMiiboConversation(String(accountId));
+      safeSendMessageToChatwork(roomId, `${replyTag}🔄 【システム】会話の履歴と設定を初期化しました。最初からご相談内容を入力してください。`);
+      const userName = getChatworkDisplayName(accountId);
+      logConversation('Chatwork', userId, userName, 'system-reset', '[システムコマンド: リセット]', '[履歴・ステート初期化完了]', '');
       return;
     }
 
+    // 画像IDがあるか確認
+    const fileIdMatch = rawBody.match(/\[download:(\d+)\]/);
+    const chatworkFileId = fileIdMatch ? fileIdMatch[1] : null;
     // 6. 画像の処理
     let base64Image = null;
     if (chatworkFileId) {
@@ -221,11 +221,9 @@ function handleChatworkEvent(json) {
       const formattedAnswer = formatForChatwork(answer);
       safeSendMessageToChatwork(roomId, `${replyTag}${formattedAnswer}`);
 
-      // ★追加: 会話ログを記録
-      if (typeof logConversation === 'function') {
-        const userName = getChatworkDisplayName(accountId);
-        logConversation('Chatwork', userId, userName, 'miibo-session', cleanBody, answer, base64Image ? 'image_attached' : '');
-      }
+      // 会話ログを記録
+      const userName = getChatworkDisplayName(accountId);
+      logConversation('Chatwork', userId, userName, 'miibo-session', cleanBody, answer, base64Image ? 'image_attached' : '');
     }
 
   } catch (e) {
@@ -286,6 +284,10 @@ function getLineDisplayName(userId) {
       'method': 'get',
       'muteHttpExceptions': true
     });
+    if (res.getResponseCode() !== 200) {
+      console.warn(`LINE Profile API returned ${res.getResponseCode()}`);
+      return '不明';
+    }
     const json = JSON.parse(res.getContentText());
     return json.displayName || '不明';
   } catch (e) {
@@ -331,7 +333,8 @@ function showLineLoadingAnimation(userId) {
       'payload': JSON.stringify({
         chatId: userId,
         loadingSeconds: 20 // 実際には返信時点で消えるので長めに設定
-      })
+      }),
+      'muteHttpExceptions': true
     });
   } catch (e) {
     // ローディング表示のエラーはメイン処理を止めないよう、ログだけ残して握りつぶす
@@ -368,12 +371,22 @@ function replyToLine(replyToken, text) {
  * Chatworkのメッセージ詳細を取得（ファイル確認用）
  */
 function getChatworkMessageDetail(roomId, messageId) {
-  const url = `https://api.chatwork.com/v2/rooms/${roomId}/messages/${messageId}`;
-  const res = UrlFetchApp.fetch(url, {
-    'headers': { 'X-ChatWorkToken': CONFIG.CHATWORK_API_TOKEN },
-    'method': 'get'
-  });
-  return JSON.parse(res.getContentText());
+  try {
+    const url = `https://api.chatwork.com/v2/rooms/${roomId}/messages/${messageId}`;
+    const res = UrlFetchApp.fetch(url, {
+      'headers': { 'X-ChatWorkToken': CONFIG.CHATWORK_API_TOKEN },
+      'method': 'get',
+      'muteHttpExceptions': true
+    });
+    if (res.getResponseCode() !== 200) {
+      console.error(`Chatwork Message API Error: ${res.getResponseCode()}`);
+      return null;
+    }
+    return JSON.parse(res.getContentText());
+  } catch (e) {
+    console.error('Failed to get Chatwork message detail:', e);
+    return null;
+  }
 }
 
 /**
@@ -383,7 +396,8 @@ function sendMessageToChatwork(roomId, text) {
   UrlFetchApp.fetch(`https://api.chatwork.com/v2/rooms/${roomId}/messages`, {
     'headers': { 'X-ChatWorkToken': CONFIG.CHATWORK_API_TOKEN },
     'method': 'post',
-    'payload': { 'body': text }
+    'payload': { 'body': text },
+    'muteHttpExceptions': true
   });
 }
 
@@ -405,4 +419,31 @@ function formatForChatwork(text) {
   formatted = formatted.replace(/```([\s\S]*?)```/g, '[code]$1[/code]');
 
   return formatted;
+}
+
+/**
+ * ユーザーの入力が「会話リセット」の意図かどうかを判定する
+ * - 「リセット」or「りせっと」を含むこと
+ * - 機器名（HGW, ルーター, ONU, Meraki 等）を含まないこと
+ * - 疑問形（？, ますか）や過去形（した, された, しました）でないこと
+ * @param {string} text - ユーザーの入力テキスト
+ * @returns {boolean}
+ */
+function isResetCommand(text) {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // 「リセット」or「りせっと」を含むか
+  if (!/リセット|りせっと/.test(trimmed)) return false;
+
+  // 除外: 機器名を含む場合は機器操作の文脈と判断
+  const devicePattern = /HGW|hgw|ルーター|ルータ|ONU|onu|Meraki|meraki|メラキ|モデム|AP|アクセスポイント|スイッチ|ハブ|Wi-?Fi|WiFi|NW機器|ファイアウォール|FW|YAMAHA|ヤマハ|D-?Link/i;
+  if (devicePattern.test(trimmed)) return false;
+
+  // 除外: 疑問形・過去形（機器リセットの相談や状況報告）
+  const questionOrPastPattern = /リセットし(た|ました|てみた|ても|たら|たけど|たが|たのに)|リセットされ(た|ました|ている|てる)|リセットできな|リセットする(べき|方法|手順)|[？?]$/;
+  if (questionOrPastPattern.test(trimmed)) return false;
+
+  return true;
 }

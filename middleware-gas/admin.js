@@ -26,6 +26,8 @@ function checkConfigWithUi() {
   if (!CONFIG.LINE_ACCESS_TOKEN) missing.push('LINE_ACCESS_TOKEN');
   if (!CONFIG.MIIBO_API_KEY) missing.push('MIIBO_API_KEY');
   if (!CONFIG.MODAL_ENDPOINT_URL) missing.push('MODAL_ENDPOINT_URL');
+  if (!CONFIG.INTERNAL_AUTH_TOKEN) missing.push('INTERNAL_AUTH_TOKEN');
+  if (!CONFIG.BOT_ACCOUNT_ID) missing.push('BOT_ACCOUNT_ID');
 
   if (missing.length > 0) {
     ui.alert('⚠️ 設定不足', '以下の項目が未設定です:\n' + missing.join('\n'), ui.ButtonSet.OK);

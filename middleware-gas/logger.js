@@ -7,7 +7,7 @@
  * @param {string} platform - 'LINE' or 'Chatwork'
  * @param {string} userId - ユーザーID
  * @param {string} userName - ユーザー表示名
- * @param {string} sessionId - Difyの会話ID
+ * @param {string} sessionId - miiboのセッションID
  * @param {string} userQuery - ユーザーの質問
  * @param {string} aiAnswer - AIの回答
  * @param {string} fileId - (Optional) 画像ファイルID
@@ -63,8 +63,11 @@ function logError(module, userId, error) {
   appendRowWithLock(sheetName, rowData);
 
   // 2. 管理者へ緊急メール通知
-  // ※通知を受け取りたいメールアドレスを設定してください
-  const ADMIN_EMAIL = "inoue@example.com"; // ←★ここに実際のメアドを入力
+  const ADMIN_EMAIL = PROPS.getProperty('ADMIN_EMAIL');
+  if (!ADMIN_EMAIL) {
+    console.warn("ADMIN_EMAIL が未設定のため、メール通知をスキップしました。");
+    return;
+  }
 
   try {
     const subject = `【緊急】現場レスキューAI エラー通知 (${module})`;
@@ -98,10 +101,12 @@ ${stackTrace}
  */
 function appendRowWithLock(sheetName, rowData) {
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
 
   try {
     // 最大10秒間ロック取得を試行
-    if (lock.tryLock(10000)) {
+    lockAcquired = lock.tryLock(10000);
+    if (lockAcquired) {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       let sheet = ss.getSheetByName(sheetName);
 
@@ -118,7 +123,9 @@ function appendRowWithLock(sheetName, rowData) {
   } catch (e) {
     console.error(`Failed to write to sheet: ${e.toString()}`);
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
