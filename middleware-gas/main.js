@@ -135,7 +135,8 @@ function cleanMarkdownForLine(text) {
   formatted = formatted.replace(/^\|[\s-]+\|[\s-]+\|.*$/gm, '');
   // (B) | Header | Value | -> ・Header : Value
   // 簡易的に2カラム〜3カラムの表をリスト形式に変換
-  formatted = formatted.replace(/^\|\s*(.*?)\s*\|\s*(.*?)\s*\|(?:\s*(.*?)\s*\|)?$/gm, function (match, c1, c2, c3) {
+  // ※ \s は改行にもマッチするため [^\S\n]（改行以外の空白）を使用
+  formatted = formatted.replace(/^\|[^\S\n]*(.*?)[^\S\n]*\|[^\S\n]*(.*?)[^\S\n]*\|(?:[^\S\n]*(.*?)[^\S\n]*\|)?$/gm, function (match, c1, c2, c3) {
     if (c3) return `・${c1} : ${c2} (${c3})`; // 3カラムの場合
     return `・${c1} : ${c2}`; // 2カラムの場合
   });

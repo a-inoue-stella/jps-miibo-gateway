@@ -552,11 +552,10 @@ function testModalClientUnit() {
     } finally { restore(); }
   }
 
-  // --- 7-3: Chatwork — roomId 未指定で例外 ---
+  // --- 7-3: Chatwork — roomId 未指定 → try-catch内で捕捉され null 返却 ---
   {
-    assertThrows('Chatwork roomId なしでエラー', function () {
-      callModalToProcessImage('chatwork', 'file_001', 'user_cw');
-    });
+    const result = callModalToProcessImage('chatwork', 'file_001', 'user_cw');
+    assertNull('Chatwork roomId なしで null が返る', result);
   }
 
   // --- 7-4: Chatwork — 正常系（2段階モック: CW API → Modal API） ---
