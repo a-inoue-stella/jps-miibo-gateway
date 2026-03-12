@@ -118,33 +118,52 @@ function handleLineEvents(json) {
 }
 
 /**
- * LINE向けにMarkdownを整形する（表組みのリスト化・太字除去）
+ * LINE向けにMarkdown記号を除去してプレーンテキスト化する
  */
 function cleanMarkdownForLine(text) {
+  return stripMarkdown(text);
+}
+
+/**
+ * Markdown記号を除去してプレーンテキスト化する共通関数
+ */
+function stripMarkdown(text) {
   if (!text) return "";
-  let formatted = text;
+  let s = text;
 
-  // 1. 太字 **text** -> 【text】 (強調)
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '【$1】');
+  // コードブロック ```lang\n...``` → 内容のみ
+  s = s.replace(/```[^\n]*\n([\s\S]*?)```/g, '$1');
 
-  // 2. 見出し ### Title -> ■ Title
-  formatted = formatted.replace(/^#{1,6}\s+(.*)$/gm, '\n■ $1');
+  // インラインコード `code` → code
+  s = s.replace(/`([^`]+)`/g, '$1');
 
-  // 3. 表組みの除去とリスト化
-  // (A) |---|---| のような区切り行を削除
-  formatted = formatted.replace(/^\|[\s-]+\|[\s-]+\|.*$/gm, '');
-  // (B) | Header | Value | -> ・Header : Value
-  // 簡易的に2カラム〜3カラムの表をリスト形式に変換
-  // ※ \s は改行にもマッチするため [^\S\n]（改行以外の空白）を使用
-  formatted = formatted.replace(/^\|[^\S\n]*(.*?)[^\S\n]*\|[^\S\n]*(.*?)[^\S\n]*\|(?:[^\S\n]*(.*?)[^\S\n]*\|)?$/gm, function (match, c1, c2, c3) {
-    if (c3) return `・${c1} : ${c2} (${c3})`; // 3カラムの場合
-    return `・${c1} : ${c2}`; // 2カラムの場合
+  // 太字・斜体 **text**, *text*, __text__, _text_ → text
+  s = s.replace(/\*\*(.*?)\*\*/g, '$1');
+  s = s.replace(/(?<![\w*])\*([^*]+)\*(?![\w*])/g, '$1');
+  s = s.replace(/__(.*?)__/g, '$1');
+  s = s.replace(/(?<![\w_])_([^_]+)_(?![\w_])/g, '$1');
+
+  // 見出し ### Title → Title
+  s = s.replace(/^#{1,6}\s+(.*)$/gm, '$1');
+
+  // 表組み: 区切り行 |---|---| を削除
+  s = s.replace(/^\|[\s-:]+\|[\s-:]+\|.*$/gm, '');
+  // 表組み: | A | B | → A : B
+  s = s.replace(/^\|[^\S\n]*(.*?)[^\S\n]*\|[^\S\n]*(.*?)[^\S\n]*\|(?:[^\S\n]*(.*?)[^\S\n]*\|)?$/gm, function (_, c1, c2, c3) {
+    if (c3) return `${c1} : ${c2} (${c3})`;
+    return `${c1} : ${c2}`;
   });
 
-  // 4. 不要な改行の整理（3連続以上の改行を2つに）
-  formatted = formatted.replace(/\n{3,}/g, '\n\n');
+  // リンク [text](url) → text
+  s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 
-  return formatted.trim();
+  // 水平線 --- / *** / ___ → (空行)
+  s = s.replace(/^[\s]*([-*_]){3,}[\s]*$/gm, '');
+
+  // 不要な改行の整理（3連続以上 → 2つ）
+  s = s.replace(/\n{3,}/g, '\n\n');
+
+  return s.trim();
 }
 
 // ==================================================
@@ -193,11 +212,13 @@ function handleChatworkEvent(json) {
   const replyTag = `[rp aid=${accountId} to=${roomId}-${messageId}]`;
 
   try {
+    // ユーザー表示名を先に取得（返信メッセージ・ログ両方で使用）
+    const userName = getChatworkDisplayName(accountId, roomId);
+
     // --- リセットコマンド判定 ---
     if (isResetCommand(cleanBody)) {
       resetMiiboConversation(String(accountId));
-      safeSendMessageToChatwork(roomId, `${replyTag}🔄 【システム】会話の履歴と設定を初期化しました。最初からご相談内容を入力してください。`);
-      const userName = getChatworkDisplayName(accountId);
+      safeSendMessageToChatwork(roomId, `${replyTag}${userName}さん\n🔄 【システム】会話の履歴と設定を初期化しました。最初からご相談内容を入力してください。`);
       logConversation('Chatwork', userId, userName, 'system-reset', '[システムコマンド: リセット]', '[履歴・ステート初期化完了]', '');
       return;
     }
@@ -217,13 +238,12 @@ function handleChatworkEvent(json) {
     // 7. miiboへ問い合わせ
     const answer = callMiiboApi(String(accountId), cleanBody, base64Image);
 
-    // 8. 結果を返信 (Markdown簡易変換あり)
+    // 8. 結果を返信
     if (answer) {
       const formattedAnswer = formatForChatwork(answer);
-      safeSendMessageToChatwork(roomId, `${replyTag}${formattedAnswer}`);
+      safeSendMessageToChatwork(roomId, `${replyTag}${userName}さん\n${formattedAnswer}`);
 
       // 会話ログを記録
-      const userName = getChatworkDisplayName(accountId);
       logConversation('Chatwork', userId, userName, 'miibo-session', cleanBody, answer, base64Image ? 'image_attached' : '');
     }
 
@@ -300,17 +320,18 @@ function getLineDisplayName(userId) {
 /**
  * Chatworkユーザーの表示名を取得する
  * @param {number|string} accountId - Chatwork アカウントID
+ * @param {number|string} roomId - Chatwork ルームID
  * @returns {string} 表示名（取得失敗時は '不明'）
  */
-function getChatworkDisplayName(accountId) {
+function getChatworkDisplayName(accountId, roomId) {
   try {
-    const res = UrlFetchApp.fetch(`https://api.chatwork.com/v2/contacts`, {
+    const res = UrlFetchApp.fetch(`https://api.chatwork.com/v2/rooms/${roomId}/members`, {
       'headers': { 'X-ChatWorkToken': CONFIG.CHATWORK_API_TOKEN },
       'method': 'get',
       'muteHttpExceptions': true
     });
-    const contacts = JSON.parse(res.getContentText());
-    const user = contacts.find(c => c.account_id === Number(accountId));
+    const members = JSON.parse(res.getContentText());
+    const user = members.find(m => m.account_id === Number(accountId));
     return user ? user.name : '不明';
   } catch (e) {
     console.warn('Failed to get Chatwork display name:', e);
@@ -403,23 +424,10 @@ function sendMessageToChatwork(roomId, text) {
 }
 
 /**
- * MarkdownをChatwork記法に簡易変換
+ * Chatwork向けにMarkdown記号を除去してプレーンテキスト化する
  */
 function formatForChatwork(text) {
-  if (!text) return "";
-  let formatted = text;
-
-  // 1. 太字 **text** -> [info]text[/info] (強調として利用)
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '[info]$1[/info]');
-
-  // 2. 見出し ### Title -> [title]Title[/title]
-  formatted = formatted.replace(/^###\s+(.*)$/gm, '[title]$1[/title]');
-  formatted = formatted.replace(/^##\s+(.*)$/gm, '[title]$1[/title]');
-
-  // 3. コードブロック ```code``` -> [code]code[/code]
-  formatted = formatted.replace(/```([\s\S]*?)```/g, '[code]$1[/code]');
-
-  return formatted;
+  return stripMarkdown(text);
 }
 
 /**

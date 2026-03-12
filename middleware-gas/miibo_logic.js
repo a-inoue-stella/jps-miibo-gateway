@@ -77,32 +77,19 @@ function resetMiiboConversation(uid) {
         "agent_id": CONFIG.MIIBO_AGENT_ID,
         "uid": String(uid),
         "utterance": "",
-        "state": {
-            "transition_trigger": "none",
-            "target_mode": "未定",
-            "fasttrack_topic": "該当なし",
-            "target_device": "不明",
-            "has_hgw": "不明",
-            "has_membership_card": "未確認",
-            "is_map_e": "不明",
-            "is_customer_present": "未確認",
-            "has_all_equipment": "未確認",
-            "meraki_series": "未確認",
-            "meraki_lan_ports": "未確認",
-            "meraki_antenna": "未確認",
-            "has_3pin_adapter": "未確認",
-            "has_setting_document": "未確認",
-            "is_kitted": "不明",
-            "has_console_cable": "未確認",
-            "has_gigaraku": "未確認",
-            "line_construction_date": "未確認",
-            "trouble_symptom": "未確認",
-            "led_status": "未確認",
-            "wiring_status": "未確認",
-            "pc_ip_type": "未確認",
-            "pc_default_gateway": "未確認",
-            "tried_actions": "未確認"
-        }
+        "state":{
+                    "current_phase": "hearing",
+                    "target_mode": "未定",
+                    "target_device": "不明",
+                    "is_map_e": "不明",
+                    "has_hgw": "不明",
+                    "line_installation_date": "不明",
+                    "fasttrack_topic": "該当なし",
+                    "current_step_status": "ヒアリング中",
+                    "line_item": "不明",
+                    "hikari_denwa": "不明"
+                }
+
     };
 
     const options = {
