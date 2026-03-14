@@ -66,10 +66,7 @@
       <input type="password" id="chatworkToken" name="chatworkToken" placeholder="BotアカウントのAPIトークン">
     </div>
     <div class="form-group">
-      <label for="botId">Bot Account ID (数値)</label>
-      <input type="number" id="botId" name="botId" placeholder="例: 1234567">
-      <div class="note">※無限ループ防止用。Bot自身のIDを入力してください。</div>
-    </div>
+
 
     <div class="section-title">miibo (Brain) 設定</div>
     <div class="form-group">
@@ -90,6 +87,19 @@
       <label for="authToken">Internal Auth Token</label>
       <input type="password" id="authToken" name="authToken" placeholder="自動生成された値を変更する場合のみ入力">
       <div class="note">※初期構築時に自動生成されます。Modal側と一致させてください。</div>
+    </div>
+
+    <div class="section-title">通知設定</div>
+    <div class="form-group">
+      <label for="adminEmail">管理者メールアドレス</label>
+      <input type="text" id="adminEmail" name="adminEmail" placeholder="admin@example.com">
+      <div class="note">※エラー通知の送信先です。</div>
+    </div>
+
+    <div class="form-group">
+      <label for="botId">Bot Account ID (任意・自動取得可)</label>
+      <input type="number" id="botId" name="botId" placeholder="未入力なら自動取得">
+      <div class="note">※無限ループ防止用。Bot自身のIDを手動で指定したい場合のみ入力してください。未入力の場合はシステムが自動取得します。</div>
     </div>
 
     <button type="submit" class="action">設定を保存</button>
