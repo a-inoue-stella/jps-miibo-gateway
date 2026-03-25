@@ -14,7 +14,7 @@ image = (
     .pip_install("requests", "pillow", "fastapi", "pydantic")
 )
 
-app = modal.App("jps-miibo-gateway", image=image)
+app = modal.App("jpc-rescue-ai", image=image)
 
 # --- Constants ---
 MAX_PAYLOAD_BYTES = 2_250_000  # Base64変換後 ≒ 3MB に相当するバイト上限
