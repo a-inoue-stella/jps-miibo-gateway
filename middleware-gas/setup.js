@@ -44,6 +44,7 @@ function saveEnvironmentConfig(formObject) {
   if (formObject.miiboAgentId) newProps['MIIBO_AGENT_ID'] = formObject.miiboAgentId;
   if (formObject.authToken) newProps['INTERNAL_AUTH_TOKEN'] = formObject.authToken;
   if (formObject.modalUrl) newProps['MODAL_ENDPOINT_URL'] = formObject.modalUrl;
+  if (formObject.adminEmail) newProps['ADMIN_EMAIL'] = formObject.adminEmail;
 
   props.setProperties(newProps);
 

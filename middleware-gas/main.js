@@ -59,7 +59,7 @@ function handleLineEvents(json) {
         // 画像IDをキャッシュに保存（有効期限10分）
         // ※Base64データは大きすぎてキャッシュ(100KB制限)に入らないため、IDのみを保持する
         cache.put('PENDING_LINE_IMAGE_ID_' + userId, messageId, 600);
-        replyToLine(replyToken, "画像を読み込みました。\n続けて、どのようなトラブルか状況を教えてください。");
+        replyToLine(replyToken, "画像を読み込みました。\n続けて状況を教えてください。");
       }
 
       // --- B. テキストが送られてきた場合 ---
