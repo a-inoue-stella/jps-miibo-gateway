@@ -15,7 +15,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Modal
-        run: pip install modal
+        run: pip install modal requests pillow fastapi
 
       - name: Deploy to Modal
         run: modal deploy backend-modal/src/app.py
