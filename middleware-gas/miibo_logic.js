@@ -3,7 +3,7 @@
  * @param {string} uid - ユーザー識別子
  * @param {string} message - 発言内容
  * @param {string} base64Image - 画像データ (null可)
- * @returns {string} - miiboからの回答テキスト
+ * @returns {{answer: string, elapsed: number}} - 回答テキストとレスポンスタイム(ms)
  */
 function callMiiboApi(uid, message, base64Image = null) {
     const agentId = CONFIG.MIIBO_AGENT_ID;
@@ -32,7 +32,10 @@ function callMiiboApi(uid, message, base64Image = null) {
     };
 
     try {
+        const startTime = Date.now();
         const response = UrlFetchApp.fetch(endpoint, options);
+        const elapsed = Date.now() - startTime;
+        console.log(`miibo API response time: ${elapsed}ms`);
         const code = response.getResponseCode();
         const content = response.getContentText();
 
@@ -41,25 +44,25 @@ function callMiiboApi(uid, message, base64Image = null) {
             json = JSON.parse(content);
         } catch (parseErr) {
             console.error("JSON Parse Error:", content);
-            return "⚠️ サーバーからの応答を解析できませんでした。";
+            return { answer: "⚠️ サーバーからの応答を解析できませんでした。", elapsed };
         }
 
         if (code !== 200) {
             console.error(`miibo API Error: ${code}`, content);
-            return `⚠️ miiboエラーが発生しました (${code})`;
+            return { answer: `⚠️ miiboエラーが発生しました (${code})`, elapsed };
         }
 
         // レスポンス形式の確認
         if (json && json.bestResponse && json.bestResponse.utterance) {
-            return json.bestResponse.utterance;
+            return { answer: json.bestResponse.utterance, elapsed };
         } else {
             console.error("Unexpected miibo response format:", content);
-            return "⚠️ miiboから有効な回答が得られませんでした。";
+            return { answer: "⚠️ miiboから有効な回答が得られませんでした。", elapsed };
         }
 
     } catch (e) {
         console.error("Call miibo Failed:", e);
-        return "⚠️ システムエラーが発生しました。時間を置いて再度お試しください。";
+        return { answer: "⚠️ システムエラーが発生しました。時間を置いて再度お試しください。", elapsed: -1 };
     }
 }
 

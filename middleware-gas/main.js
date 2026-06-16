@@ -8,6 +8,14 @@
 // const CONFIG = ...; 
 
 /**
+ * エントリーポイント: GETリクエスト (ブラウザアクセス・ヘルスチェック用)
+ * Webhookは POST のみ使用するため、GETは簡易レスポンスを返す
+ */
+function doGet(e) {
+  return ContentService.createTextOutput("OK");
+}
+
+/**
  * エントリーポイント: Webhook受信
  */
 function doPost(e) {
@@ -90,7 +98,7 @@ function handleLineEvents(json) {
         }
 
         // miiboへ問い合わせ
-        const answer = callMiiboApi(userId, userQuery, base64Image);
+        const { answer, elapsed } = callMiiboApi(userId, userQuery, base64Image);
 
         // ★修正: ここでMarkdown整形関数を通す
         const formattedAnswer = cleanMarkdownForLine(answer);
@@ -102,7 +110,7 @@ function handleLineEvents(json) {
         const userName = getLineDisplayName(userId);
 
         // ログ保存
-        logConversation('LINE', userId, userName, 'miibo-session', userQuery, answer, base64Image ? 'image_attached' : '');
+        logConversation('LINE', userId, userName, 'miibo-session', userQuery, answer, base64Image ? 'image_attached' : '', elapsed);
       }
 
       // --- C. その他（スタンプなど） ---
@@ -236,7 +244,7 @@ function handleChatworkEvent(json) {
     }
 
     // 7. miiboへ問い合わせ
-    const answer = callMiiboApi(String(accountId), cleanBody, base64Image);
+    const { answer, elapsed } = callMiiboApi(String(accountId), cleanBody, base64Image);
 
     // 8. 結果を返信
     if (answer) {
@@ -244,7 +252,7 @@ function handleChatworkEvent(json) {
       safeSendMessageToChatwork(roomId, `${replyTag}${userName}さん\n${formattedAnswer}`);
 
       // 会話ログを記録
-      logConversation('Chatwork', userId, userName, 'miibo-session', cleanBody, answer, base64Image ? 'image_attached' : '');
+      logConversation('Chatwork', userId, userName, 'miibo-session', cleanBody, answer, base64Image ? 'image_attached' : '', elapsed);
     }
 
   } catch (e) {

@@ -11,8 +11,9 @@
  * @param {string} userQuery - ユーザーの質問
  * @param {string} aiAnswer - AIの回答
  * @param {string} fileId - (Optional) 画像ファイルID
+ * @param {number|null} responseTime_ms - (Optional) miibo APIレスポンスタイム(ms)
  */
-function logConversation(platform, userId, userName, sessionId, userQuery, aiAnswer, fileId = '') {
+function logConversation(platform, userId, userName, sessionId, userQuery, aiAnswer, fileId = '', responseTime_ms = null) {
   // プラットフォームに応じてシートを切り替え
   const sheetName = (platform === 'LINE') ? CONFIG.LOG_SHEET_LINE : CONFIG.LOG_SHEET_CHATWORK;
   const now = new Date();
@@ -23,16 +24,17 @@ function logConversation(platform, userId, userName, sessionId, userQuery, aiAns
   const safeAnswer = maskPII(aiAnswer);
 
   // 書き込みデータ
-  // [Timestamp, Platform, UserID, UserName, SessionID, UserQuery, AIAnswer, ImageAttached]
+  // [Timestamp, Platform, UserID, UserName, SessionID, UserQuery, AIAnswer, ImageAttached, ResponseTime_ms]
   const rowData = [
     now,
     platform,
     userId,
     userName,
     sessionId,
-    safeQuery,   // マスク済みデータ
-    safeAnswer,  // マスク済みデータ
-    fileId
+    safeQuery,       // マスク済みデータ
+    safeAnswer,      // マスク済みデータ
+    fileId,
+    responseTime_ms
   ];
 
   appendRowWithLock(sheetName, rowData);
